@@ -15,92 +15,148 @@ public class Node {
    }
 
    public static Node parsePostfix (String s) {
-      if (s == null)
-         throw new RuntimeException ("Sisendsõne on null: " + s);
-      if (s.isEmpty())
-         throw new RuntimeException ("Sisendsõne on tühi: \"" + s + "\"");
+      if (s == null) {
+         throw new RuntimeException("Tree input must not be null: " + s);
+      }
 
-      Stack<List<Node>> stack = new Stack<List<Node>>();
-      List<Node> current = new ArrayList<Node>();
-      List<Node> closed = null;
-      int i = 0;
-      while (i < s.length()) {
-         char c = s.charAt (i);
-         char prev = i > 0 ? s.charAt (i - 1) : '(';
-         if (Character.isWhitespace (c)) {
-            throw new RuntimeException ("Sõnes \"" + s + "\" on tühik kohal " + i);
-         } else if (c == '(') {
-            if (prev != '(' && prev != ',')
-               throw new RuntimeException ("Sõnes \"" + s + "\" on '(' valel kohal " + i);
-            stack.push (current);
-            current = new ArrayList<Node>();
-            i++;
-         } else if (c == ',' || c == ')') {
-            if ("(),".indexOf (prev) >= 0)
-               throw new RuntimeException ("Sõnes \"" + s + "\" puudub tipu nimi kohal " + i);
-            if (stack.isEmpty())
-               throw new RuntimeException ("Sõnes \"" + s + "\" on liigne '" + c + "' kohal " + i);
-            if (c == ')') {
-               closed = current;
-               current = stack.pop();
+      Node root = new Node(null, null, null);
+      Node current = root;
+
+      Stack<Node> parents = new Stack<>();
+
+      for (int i = 0; i < s.length(); i++) {
+         char c = s.charAt(i);
+         if (Character.isWhitespace(c) || Character.isSpaceChar(c)) {
+            continue;
+         }
+
+         if (c == '(') {
+            if (current.name != null || current.firstChild != null) {
+               throw new RuntimeException("A node may have only one child list, before its name. Input: \"" + s + "\"");
             }
-            i++;
+            parents.push(current);
+            current.firstChild = new Node(null, null, null);
+            current = current.firstChild;
+         } else if (c == ',') {
+            if (current.name == null) {
+               throw new RuntimeException("Missing node name before ','. Input: \"" + s + "\"");
+            }
+            if (parents.empty()) {
+               throw new RuntimeException("A tree must have only one root. Unexpected ','. Input: \"" + s + "\"");
+            }
+            current.nextSibling = new Node(null, null, null);
+            current = current.nextSibling;
+         } else if (c == ')') {
+            if (parents.empty()) {
+               throw new RuntimeException("Closing ')' has no matching '('. Input: \"" + s + "\"");
+            }
+            if (current.name == null) {
+               throw new RuntimeException("Missing node name before ')'. Input: \"" + s + "\"");
+            }
+            current = parents.pop();
          } else {
-            int start = i;
-            while (i < s.length() && "(),".indexOf (s.charAt (i)) < 0
-                    && !Character.isWhitespace (s.charAt (i)))
-               i++;
-            Node first = null;
-            if (closed != null) {
-               for (int k = closed.size() - 1; k >= 0; k--) {
-                  closed.get (k).nextSibling = first;
-                  first = closed.get (k);
-               }
-               closed = null;
+            if (current.name != null) {
+               throw new RuntimeException("Whitespace is not allowed inside a node name. Input: \"" + s + "\"");
             }
-            current.add (new Node (s.substring (start, i), first, null));
+            int start = i;
+            while (i < s.length()) {
+               char letter = s.charAt(i);
+               if (letter == '(' || letter == ')' || letter == ','
+                       || Character.isWhitespace(letter) || Character.isSpaceChar(letter)) {
+                  break;
+               }
+               i++;
+            }
+            current.name = s.substring(start, i);
+            i--;
          }
       }
-      if (!stack.isEmpty())
-         throw new RuntimeException ("Sõnes \"" + s + "\" on sulge, mis ei ole suletud");
-      if ("(),".indexOf (s.charAt (s.length() - 1)) >= 0)
-         throw new RuntimeException ("Sõnes \"" + s + "\" puudub juurtipu nimi");
-      return current.get (0);
+
+      if (!parents.empty()) {
+         throw new RuntimeException("Missing closing ')'. Input: \"" + s + "\"");
+      }
+      if (current.name == null) {
+         throw new RuntimeException("Missing node name. Input: \"" + s + "\"");
+      }
+      return root;
    }
 
    public String leftParentheticRepresentation() {
-      StringBuilder b = new StringBuilder();
-      build (b);
-      return b.toString();
+      StringBuilder result = new StringBuilder();
+      Stack<Node> parents = new Stack<>();
+      Node current = this;
+
+      while (true) {
+         result.append(current.name);
+         if (current.firstChild != null) {
+            result.append('(');
+            parents.push(current);
+            current = current.firstChild;
+         } else {
+            while (current != this && current.nextSibling == null) {
+               result.append(')');
+               current = parents.pop();
+            }
+            if (current == this) {
+               return result.toString();
+            }
+            result.append(',');
+            current = current.nextSibling;
+         }
+      }
    }
 
-   private void build (StringBuilder b) {
-      b.append (name);
-      if (firstChild != null) {
-         b.append ('(');
-         for (Node c = firstChild; c != null; c = c.nextSibling) {
-            c.build (b);
-            if (c.nextSibling != null)
-               b.append (',');
-         }
-         b.append (')');
+   /**
+    * Tagastab puu pseudo-XML kujul. Juure sügavus on 1.
+    * @return puu märgendite ja taanetega
+    */
+   public String toXML() {
+      StringBuilder result = new StringBuilder();
+      appendXML(result, 1);
+      return result.toString();
+   }
+
+   /**
+    * Lisab selle tipu ja tema järglased ühisesse puhvrisse.
+    * @param result tulemuse puhver
+    * @param depth selle tipu sügavus
+    */
+   private void appendXML (StringBuilder result, int depth) {
+      for (int i = 1; i < depth; i++) {
+         result.append("    ");
       }
+      result.append("<L").append(depth).append("> ").append(name);
+
+      if (firstChild != null) {
+         result.append('\n');
+         for (Node child = firstChild; child != null; child = child.nextSibling) {
+            child.appendXML(result, depth + 1);
+         }
+         for (int i = 1; i < depth; i++) {
+            result.append("    ");
+         }
+      } else {
+         result.append(' ');
+      }
+
+      result.append("</L").append(depth).append(">\n");
    }
 
    public static void main (String[] param) {
-      String[] tests = { "(B1,C)A", "A", "((C,D)B,E)A", "(((512,1)-,4)*,(-6,3)/)+" };
-      for (String s : tests)
-         System.out.println (s + " ==> " + parsePostfix (s).leftParentheticRepresentation());
+      String s = "(B1,C)A";
+      Node t = Node.parsePostfix (s);
+      String v = t.leftParentheticRepresentation();
+      System.out.println (s + " ==> " + v); // (B1,C)A ==> A(B1,C)
+      System.out.println(t.toXML());
 
-      String[] bad = { "", "()A", "(B,C", "(B,C)", "(B C)A", "(B,,C)A", "A(B)", "(B,C)A)",
-              "A,B", "((B)", "(B))A", "((B),C)", ",A", "(B,)A" };
-      for (String s : bad) {
-         try {
-            parsePostfix (s);
-            System.out.println ("\"" + s + "\" ==> viga puudub (ootamatu)");
-         } catch (RuntimeException e) {
-            System.out.println ("\"" + s + "\" ==> " + e.getMessage());
-         }
-      }
+      s = "A";
+      t = Node.parsePostfix (s);
+      System.out.println (s + " ==> " + t.leftParentheticRepresentation());
+      System.out.println(t.toXML());
+
+      s = "((C)B,(E,F)D,G)A";
+      t = Node.parsePostfix(s);
+      System.out.println(s + " ==> XML");
+      System.out.println(t.toXML());
    }
 }

@@ -8,7 +8,7 @@ import org.junit.Test;
 public class NodeTest {
 
    @Test (timeout=1000)
-   public void testParsePostfix() { 
+   public void testParsePostfix() {
       String s = "(B1,C,D)A";
       Node t = Node.parsePostfix (s);
       String r = t.leftParentheticRepresentation();
@@ -44,7 +44,7 @@ public class NodeTest {
       s = "((1,(2)3,4)5)6";
       t = Node.parsePostfix (s);
       r = t.leftParentheticRepresentation();
-       assertEquals ("Tree: " + s, "6(5(1,3(2),4))", r);
+      assertEquals ("Tree: " + s, "6(5(1,3(2),4))", r);
    }
 
    @Test (timeout=1000)
@@ -57,7 +57,7 @@ public class NodeTest {
       t = new Node (s, null, null);
       r = t.leftParentheticRepresentation();
       assertEquals ("Single node" + s, s, r);
-   } 
+   }
 
    @Test (timeout=1000)
    public void testMore() {
@@ -142,5 +142,54 @@ public class NodeTest {
       Node root = Node.parsePostfix ("((A)B,(C)D)");
    }
 
-}
+   // Kontrollib XML-i puud, kus on ainult üks tipp A.
+   @Test (timeout=1000)
+   public void testToXMLSingleRoot() {
+      String s = "A";
+      Node t = Node.parsePostfix (s);
+      String r = t.toXML().replaceAll ("\\s", "");
+      assertEquals ("Tree: " + s, "<L1>A</L1>", r);
+   }
 
+   // Kontrollib, et A lapsed B, C ja D tulevad XML-is samas järjekorras.
+   @Test (timeout=1000)
+   public void testToXMLSiblings() {
+      String s = "(B,C,D)A";
+      Node t = Node.parsePostfix (s);
+      String r = t.toXML().replaceAll ("\\s", "");
+      assertEquals ("Tree: " + s,
+              "<L1>A<L2>B</L2><L2>C</L2><L2>D</L2></L1>", r);
+   }
+
+   // Kontrollib, et igal järgmisel lapsel kasvab L-number ühe võrra.
+   @Test (timeout=1000)
+   public void testToXMLDeepTree() {
+      String s = "((((E)D)C)B)A";
+      Node t = Node.parsePostfix (s);
+      String r = t.toXML().replaceAll ("\\s", "");
+      assertEquals ("Tree: " + s,
+              "<L1>A<L2>B<L3>C<L4>D<L5>E</L5></L4></L3></L2></L1>", r);
+   }
+
+   // Kontrollib, et XML vastab etteantud tulemusele.
+   @Test (timeout=1000)
+   public void testToXMLTeacherExample() {
+      String s = "((C)B,(E,F)D,G)A";
+      Node t = Node.parsePostfix (s);
+      String r = t.toXML().replaceAll ("\\s", "");
+      assertEquals ("Tree: " + s,
+              "<L1>A<L2>B<L3>C</L3></L2>"
+                      + "<L2>D<L3>E</L3><L3>F</L3></L2><L2>G</L2></L1>", r);
+   }
+
+   // Kontrollib, et kaks sama nimega last on mõlemad XML-is olemas.
+   @Test (timeout=1000)
+   public void testToXMLSameNames() {
+      String s = "(B,B)A";
+      Node t = Node.parsePostfix (s);
+      String r = t.toXML().replaceAll ("\\s", "");
+      assertEquals ("Tree: " + s,
+              "<L1>A<L2>B</L2><L2>B</L2></L1>", r);
+   }
+
+}
